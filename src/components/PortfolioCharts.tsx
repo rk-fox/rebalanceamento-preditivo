@@ -158,7 +158,20 @@ export default function PortfolioCharts({
   };
 
   // Color Palette for Pie Chart Cells
-  const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#14b8a6', '#8b5cf6'];
+  const COLORS = [
+    '#3b82f6', // Blue
+    '#10b981', // Emerald
+    '#f59e0b', // Amber
+    '#ec4899', // Pink
+    '#8b5cf6', // Violet
+    '#ef4444', // Red
+    '#06b6d4', // Cyan
+    '#84cc16', // Lime
+    '#f97316', // Orange
+    '#6366f1', // Indigo
+    '#14b8a6', // Teal
+    '#eab308'  // Yellow
+  ];
 
   return (
     <div id="portfolio-charts-container" className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl space-y-6">
