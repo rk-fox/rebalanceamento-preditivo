@@ -94,16 +94,15 @@ export default async function handler(req: any, res: any) {
 
     const results = await Promise.all(quotePromises);
 
-    // Convert results array to an object mapped by ticker
-    const pricesMap = results.reduce((acc, curr) => {
-      acc[curr.ticker] = curr;
-      return acc;
-    }, {} as Record<string, any>);
+    // Convert to map for client ease
+    const quotesMap: Record<string, number | null> = {};
+    results.forEach((q) => {
+      quotesMap[q.ticker] = q.price;
+    });
 
     return res.status(200).json({
-      success: true,
+      quotes: quotesMap,
       usdBrlRate,
-      prices: pricesMap,
     });
   } catch (error: any) {
     console.error('Error fetching live quotes:', error);

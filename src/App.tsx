@@ -79,7 +79,7 @@ export default function App() {
 
       setAssets(prev =>
         prev.map(asset => {
-          const livePrice = data.quotes[asset.ticker.toUpperCase()];
+          const livePrice = (data.quotes && data.quotes[asset.ticker.toUpperCase()]) ?? null;
           if (livePrice !== undefined && livePrice !== null) {
             const currentValue = asset.currency === 'USD'
               ? asset.quantity * livePrice * newUsdRate
