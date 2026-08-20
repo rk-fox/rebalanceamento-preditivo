@@ -13,6 +13,7 @@ import PortfolioCharts from './components/PortfolioCharts';
 import ContributionLogger from './components/ContributionLogger';
 import { Asset, CategoryAllocation, RebalanceOutput } from './types';
 import { ParsedAssetResult, getImportValues } from './utils/parser';
+import { logAutomatedContribution } from './utils/history';
 import { fetchAssets, fetchAllocations, saveAsset, deleteAssetFromDb, saveAllocations, resetLocalData, googleSignIn, logout, syncToDrive, syncFromDrive, initAuth } from './lib/storage';
 import { RefreshCw, RotateCcw, Database, CheckCircle2, Cloud, LogOut, LayoutDashboard, Scale, Coins, Briefcase, Settings, Landmark } from 'lucide-react';
 import { User } from 'firebase/auth';
@@ -368,6 +369,26 @@ export default function App() {
 
     try {
       await saveAsset(assetWithId);
+      
+      // Calculate automated contribution
+      const currentEquityBRL = assets.reduce((sum, item) => {
+        const val = item.currentValue !== undefined && item.currentValue !== null ? item.currentValue : item.invested_amount;
+        return sum + (item.currency === 'USD' && item.currentValue === undefined ? val * usdToBrlRate : val);
+      }, 0);
+
+      const existingAsset = assets.find(a => a.ticker.toUpperCase() === newAsset.ticker.toUpperCase());
+      const newAmountBRL = newAsset.currency === 'USD' ? newAsset.invested_amount * usdToBrlRate : newAsset.invested_amount;
+      
+      if (!existingAsset) {
+        logAutomatedContribution(newAmountBRL, currentEquityBRL + newAmountBRL);
+      } else {
+        const oldAmountBRL = existingAsset.currency === 'USD' ? existingAsset.invested_amount * usdToBrlRate : existingAsset.invested_amount;
+        if (newAmountBRL > oldAmountBRL) {
+          const delta = newAmountBRL - oldAmountBRL;
+          logAutomatedContribution(delta, currentEquityBRL + delta);
+        }
+      }
+
     } catch (err: any) {
       console.error(err);
       setSyncStatus({ 
@@ -442,6 +463,32 @@ export default function App() {
         }
 
         await saveAsset(finalAsset);
+
+        // Log Contribution
+        const currentEquityBRL = assets.reduce((sum, item) => {
+          const val = item.currentValue !== undefined && item.currentValue !== null ? item.currentValue : item.invested_amount;
+          return sum + (item.currency === 'USD' && item.currentValue === undefined ? val * usdToBrlRate : val);
+        }, 0);
+
+        let contributionBRL = 0;
+        const newImportBRL = parsed.currency === 'USD' ? importValue * usdToBrlRate : importValue;
+        
+        if (importMode === 'accumulate') {
+          contributionBRL = newImportBRL;
+        } else if (importMode === 'replace') {
+          if (existing) {
+            const oldBRL = existing.currency === 'USD' ? existing.invested_amount * usdToBrlRate : existing.invested_amount;
+            if (newImportBRL > oldBRL) {
+              contributionBRL = newImportBRL - oldBRL;
+            }
+          } else {
+            contributionBRL = newImportBRL;
+          }
+        }
+        
+        if (contributionBRL > 0) {
+          logAutomatedContribution(contributionBRL, currentEquityBRL + contributionBRL, parsed.date);
+        }
       }
       
     } catch (err: any) {
@@ -804,6 +851,7 @@ export default function App() {
                     <DataImporter
                       onImportAssets={handleImportAssets}
                       usdToBrlRate={usdToBrlRate}
+                      categories={allocations.map(a => a.category)}
                     />
                   </div>
                 </div>

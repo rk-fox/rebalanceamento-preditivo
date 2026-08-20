@@ -138,8 +138,17 @@ export default function AssetList({
     e.preventDefault();
     if (!ticker.trim() || !category || quantity === '' || investedAmount === '') return;
 
+    const formattedTicker = ticker.trim().toUpperCase();
+    const existingAsset = assets.find(a => a.ticker.toUpperCase() === formattedTicker);
+    
+    if (existingAsset) {
+      if (!window.confirm(`O ativo ${formattedTicker} já existe na sua carteira. Deseja realmente sobrescrevê-lo?\n\nSe deseja apenas acumular o valor, cancele e utilize a aba 'Adicionar / Importar' -> 'Lançamento Manual'.`)) {
+        return;
+      }
+    }
+
     onAddAsset({
-      ticker: ticker.trim().toUpperCase(),
+      ticker: formattedTicker,
       category,
       quantity: parseFloat(quantity.toString()) || 0,
       currency,

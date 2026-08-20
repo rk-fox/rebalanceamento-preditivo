@@ -1,4 +1,5 @@
 import { Asset, CategoryAllocation } from '../types';
+import { getHistory, saveHistory } from '../utils/history';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
 const firebaseConfig = {
@@ -247,7 +248,8 @@ export async function syncToDrive(): Promise<boolean> {
 
     const assets = await fetchAssets();
     const allocations = await fetchAllocations();
-    const payload = JSON.stringify({ assets, allocations });
+    const history = getHistory();
+    const payload = JSON.stringify({ assets, allocations, history });
 
     let fileId = await getDriveFileId(accessToken);
     console.log('syncToDrive: File ID check result:', fileId);
@@ -361,6 +363,7 @@ export async function syncFromDrive(): Promise<boolean> {
     const data = await response.json();
     if (data.assets) localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify(data.assets));
     if (data.allocations) localStorage.setItem(ALLOCATIONS_STORAGE_KEY, JSON.stringify(data.allocations));
+    if (data.history) saveHistory(data.history);
     console.log('syncFromDrive: Restore completed successfully!');
     return true;
   } catch (error: any) {

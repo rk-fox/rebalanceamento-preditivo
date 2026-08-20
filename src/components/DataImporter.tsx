@@ -11,13 +11,23 @@ import { FileText, Clipboard, AlertCircle, Check, HelpCircle, CornerDownRight, R
 interface DataImporterProps {
   onImportAssets: (parsedAssets: ParsedAssetResult[], importMode: 'replace' | 'accumulate') => void;
   usdToBrlRate: number;
+  categories: string[];
 }
 
-export default function DataImporter({ onImportAssets, usdToBrlRate }: DataImporterProps) {
+export default function DataImporter({ onImportAssets, usdToBrlRate, categories }: DataImporterProps) {
   const [inputText, setInputText] = useState('');
   const [parsedResults, setParsedResults] = useState<ParsedAssetResult[]>([]);
   const [importMode, setImportMode] = useState<'replace' | 'accumulate'>('replace');
   const [showHelp, setShowHelp] = useState(false);
+  const [activeTab, setActiveTab] = useState<'text' | 'manual'>('text');
+  
+  // For manual accumulation
+  const [manualTicker, setManualTicker] = useState('');
+  const [manualCategory, setManualCategory] = useState('');
+  const [manualQty, setManualQty] = useState<number | ''>('');
+  const [manualCurrency, setManualCurrency] = useState<Currency>('BRL');
+  const [manualValue, setManualValue] = useState<number | ''>('');
+  const [manualDate, setManualDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Parse action
   const handleParse = () => {
@@ -86,21 +96,69 @@ manual`;
     setParsedResults(updated);
   };
 
+  const handleManualAccumulate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualTicker.trim() || !manualCategory || manualQty === '' || manualValue === '') return;
+
+    const parsedAsset: ParsedAssetResult = {
+      ticker: manualTicker.trim().toUpperCase(),
+      category: manualCategory,
+      type: 'Compra',
+      quantity: parseFloat(manualQty.toString()),
+      currency: manualCurrency,
+      originalValue: parseFloat(manualValue.toString()),
+      totalValueBRL: manualCurrency === 'USD' ? parseFloat(manualValue.toString()) * usdToBrlRate : parseFloat(manualValue.toString()),
+      date: manualDate,
+    };
+
+    onImportAssets([parsedAsset], 'accumulate');
+    
+    // Reset form
+    setManualTicker('');
+    setManualQty('');
+    setManualValue('');
+    alert(`Posição de ${parsedAsset.ticker} acumulada com sucesso!`);
+  };
+
   return (
     <div id="data-importer" className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl transition-all duration-300">
-      <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 border-b border-zinc-800 pb-3 gap-3">
         <div className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-indigo-400" />
-          <h2 className="text-lg font-semibold text-zinc-100 font-sans">Importador por Leitura de Texto da Corretora</h2>
+          <h2 className="text-lg font-semibold text-zinc-100 font-sans">Adicionar / Importar</h2>
         </div>
-        <button
-          onClick={() => setShowHelp(!showHelp)}
-          className="text-zinc-400 hover:text-zinc-200 p-1 rounded-lg"
-          title="Ver formato suportado"
-        >
-          <HelpCircle className="w-4.5 h-4.5" />
-        </button>
+        <div className="flex bg-zinc-950 p-1 rounded-lg border border-zinc-800">
+          <button
+            onClick={() => setActiveTab('text')}
+            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${activeTab === 'text' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Leitura de Texto
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('manual');
+              if (!manualCategory && categories && categories.length > 0) setManualCategory(categories[0]);
+            }}
+            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${activeTab === 'manual' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Lançamento Manual
+          </button>
+        </div>
       </div>
+
+      {activeTab === 'text' && (
+        <>
+          <div className="flex justify-end mb-2">
+            <button
+              onClick={() => setShowHelp(!showHelp)}
+              className="text-zinc-400 hover:text-zinc-200 p-1 rounded-lg flex items-center gap-1 text-xs"
+              title="Ver formato suportado"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span>Ver Formato</span>
+            </button>
+          </div>
+
 
       {showHelp && (
         <div className="bg-zinc-950 border border-zinc-800/80 p-3 rounded-lg text-xs text-zinc-400 mb-4 space-y-2 animate-fade-in leading-relaxed">
@@ -313,6 +371,104 @@ manual`;
             </button>
           </div>
         </div>
+      )}
+      </>
+      )}
+
+      {activeTab === 'manual' && (
+        <form onSubmit={handleManualAccumulate} className="space-y-4 animate-fade-in">
+          <div className="bg-indigo-950/20 border border-indigo-800/40 p-3 rounded-lg text-xs text-indigo-400 mb-4">
+            Este formulário é focado em <strong>Acumular Posições</strong>. Os valores digitados aqui serão somados aos ativos já existentes na sua carteira. Se o ativo não existir, ele será criado.
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] text-zinc-400 font-medium mb-1 uppercase font-sans">Ticker</label>
+              <input
+                type="text"
+                placeholder="WEGE3"
+                value={manualTicker}
+                onChange={(e) => setManualTicker(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 uppercase font-mono"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-zinc-400 font-medium mb-1 uppercase font-sans">Categoria</label>
+              <select
+                value={manualCategory}
+                onChange={(e) => setManualCategory(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                required
+              >
+                <option value="" disabled>Selecione a categoria</option>
+                {categories && categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+                {(!categories || !categories.includes(manualCategory)) && manualCategory && (
+                  <option value={manualCategory}>{manualCategory}</option>
+                )}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] text-zinc-400 font-medium mb-1 uppercase font-sans">Quantidade a Somar</label>
+              <input
+                type="number"
+                step="any"
+                placeholder="Ex: 50"
+                value={manualQty}
+                onChange={(e) => setManualQty(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 font-mono"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-zinc-400 font-medium mb-1 uppercase font-sans">Moeda</label>
+              <select
+                value={manualCurrency}
+                onChange={(e) => setManualCurrency(e.target.value as Currency)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 font-mono"
+              >
+                <option value="BRL">BRL (R$)</option>
+                <option value="USD">USD (US$)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] text-zinc-400 font-medium mb-1 uppercase font-sans">Data do Lançamento</label>
+              <input
+                type="date"
+                value={manualDate}
+                onChange={(e) => setManualDate(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 font-mono"
+                required
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[10px] text-zinc-400 font-medium mb-1 uppercase font-sans">
+                Valor Total do Aporte ({manualCurrency === 'USD' ? 'US$' : 'R$'})
+              </label>
+              <input
+                type="number"
+                step="any"
+                placeholder="Ex: 2000"
+                value={manualValue}
+                onChange={(e) => setManualValue(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 font-mono"
+                required
+              />
+            </div>
+          </div>
+          
+          <button
+            type="submit"
+            className="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+          >
+            <Layers className="w-4 h-4" />
+            Acumular Lançamento
+          </button>
+        </form>
       )}
     </div>
   );

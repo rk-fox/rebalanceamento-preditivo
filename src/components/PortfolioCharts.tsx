@@ -24,6 +24,7 @@ import {
 } from 'recharts';
 import { BarChart3, PieChart as PieIcon, History, TrendingUp, PlusCircle, Trash2, CheckCircle2 } from 'lucide-react';
 import { calculateRebalance } from '../utils/rebalancer';
+import { getHistory, saveHistory, HistorySnapshot, logAutomatedContribution } from '../utils/history';
 
 interface PortfolioChartsProps {
   assets: Asset[];
@@ -32,18 +33,6 @@ interface PortfolioChartsProps {
   rebalanceResult: RebalanceOutput | null;
 }
 
-interface HistorySnapshot {
-  id: string;
-  date: string;
-  depositAmount: number;
-  totalEquity: number;
-}
-
-const DEFAULT_HISTORY: HistorySnapshot[] = [
-  { id: 'h1', date: 'Abr 2026', depositAmount: 1500, totalEquity: 12000 },
-  { id: 'h2', date: 'Mai 2026', depositAmount: 2000, totalEquity: 14800 },
-  { id: 'h3', date: 'Jun 2026', depositAmount: 1800, totalEquity: 17200 },
-];
 
 export default function PortfolioCharts({
   assets,
@@ -57,19 +46,24 @@ export default function PortfolioCharts({
   const [logSuccess, setLogSuccess] = useState(false);
 
   // Load history from localStorage
+  const loadData = () => {
+    setHistory(getHistory());
+  };
+
   useEffect(() => {
-    const saved = localStorage.getItem('pe_portfolio_history');
-    if (saved) {
-      setHistory(JSON.parse(saved));
-    } else {
-      setHistory(DEFAULT_HISTORY);
-      localStorage.setItem('pe_portfolio_history', JSON.stringify(DEFAULT_HISTORY));
-    }
+    loadData();
+    const handleUpdate = () => loadData();
+    window.addEventListener('pe_history_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('pe_history_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
   const saveHistoryToLocalStorage = (newHistory: HistorySnapshot[]) => {
+    saveHistory(newHistory);
     setHistory(newHistory);
-    localStorage.setItem('pe_portfolio_history', JSON.stringify(newHistory));
   };
 
   // Helper to safely get the current BRL value of an asset
@@ -133,19 +127,8 @@ export default function PortfolioCharts({
 
   const handleAddCurrentToHistory = () => {
     if (rebalanceResult && rebalanceResult.depositAmount > 0) {
-      const today = new Date();
-      const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' });
-      const dateStr = formatter.format(today);
-
-      const newSnapshot: HistorySnapshot = {
-        id: Math.random().toString(36).substring(2, 9),
-        date: dateStr.charAt(0).toUpperCase() + dateStr.slice(1),
-        depositAmount: rebalanceResult.depositAmount,
-        totalEquity: currentTotalEquity + rebalanceResult.depositAmount,
-      };
-
-      const updated = [...history, newSnapshot];
-      saveHistoryToLocalStorage(updated);
+      logAutomatedContribution(rebalanceResult.depositAmount, currentTotalEquity + rebalanceResult.depositAmount);
+      setHistory(getHistory());
       setLogSuccess(true);
       setTimeout(() => setLogSuccess(false), 3000);
     }
