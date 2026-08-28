@@ -103,7 +103,7 @@ manual`;
     const parsedAsset: ParsedAssetResult = {
       ticker: manualTicker.trim().toUpperCase(),
       category: manualCategory,
-      type: 'Compra',
+      action: 'compra',
       quantity: parseFloat(manualQty.toString()),
       currency: manualCurrency,
       originalValue: parseFloat(manualValue.toString()),
